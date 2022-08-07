@@ -118,12 +118,12 @@ class MainActivity : AppCompatActivity() {
 
             try {
                 camera = localCameraProvider.bindToLifecycle(
-                    this,
+                    this@MainActivity,
                     lensFacing,
                     preview,
                     videoCapture,
                 )
-                
+
                 preview?.setSurfaceProvider(viewFinder.surfaceProvider)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to bind use cases", e)
@@ -157,6 +157,12 @@ class MainActivity : AppCompatActivity() {
         }.build()
 
         if (!isRecording) {
+            if (activityMainBinding.videoView.isPlaying) {
+                activityMainBinding.btnRemoveVideo.visibility = View.GONE
+                activityMainBinding.videoView.pause()
+                activityMainBinding.videoView.visibility = View.GONE
+            }
+
             animateRecord.start()
             localVideoCapture.startRecording(
                 outputOptions,
@@ -194,7 +200,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun playVideo(uri: Uri) {
 
-        activityMainBinding.viewFinder.visibility = View.GONE
         activityMainBinding.videoView.visibility = View.VISIBLE
 
 
@@ -227,7 +232,6 @@ class MainActivity : AppCompatActivity() {
     private fun removeVideo() {
 
         activityMainBinding.videoView.visibility = View.GONE
-        activityMainBinding.viewFinder.visibility = View.VISIBLE
         activityMainBinding.btnRemoveVideo.visibility = View.GONE
 
         startCamera()
