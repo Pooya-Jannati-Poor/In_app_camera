@@ -25,6 +25,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.animation.doOnCancel
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import ir.arinateam.inappcamera.databinding.ActivityMainBinding
 import kotlinx.coroutines.Dispatchers
@@ -131,7 +132,7 @@ class MainActivity : AppCompatActivity() {
         }, ContextCompat.getMainExecutor(this))
     }
 
-    @SuppressLint("MissingPermission", "RestrictedApi")
+    @SuppressLint("RestrictedApi")
     private fun recordVideo() {
         val localVideoCapture =
             videoCapture ?: throw IllegalStateException("Camera initialization failed.")
@@ -156,6 +157,8 @@ class MainActivity : AppCompatActivity() {
             VideoCapture.OutputFileOptions.Builder(file)
         }.build()
 
+
+
         if (!isRecording) {
             if (activityMainBinding.videoView.isPlaying) {
                 activityMainBinding.btnRemoveVideo.visibility = View.GONE
@@ -164,7 +167,67 @@ class MainActivity : AppCompatActivity() {
             }
 
             animateRecord.start()
+            if (ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.RECORD_AUDIO
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                // TODO: Consider calling
+                //    ActivityCompat#requestPermissions
+                // here to request the missing permissions, and then overriding
+                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                //                                          int[] grantResults)
+                // to handle the case where the user grants the permission. See the documentation
+                // for ActivityCompat#requestPermissions for more details.
+                return
+            }
+
+            val timestamp = System.currentTimeMillis()
+
+            val contentValues = ContentValues()
+            contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, timestamp)
+            contentValues.put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
+
             localVideoCapture.startRecording(
+                VideoCapture.OutputFileOptions.Builder(
+                    contentResolver,
+                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                    contentValues
+                ).build(),
+                mainExecutor(),
+                object : VideoCapture.OnVideoSavedCallback {
+                    override fun onVideoSaved(outputFileResults: VideoCapture.OutputFileResults) {
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Video has been saved successfully.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+
+                        activityMainBinding.btnRemoveVideo.visibility = View.VISIBLE
+                        playVideo(outputFileResults.savedUri!!)
+
+                    }
+
+                    override fun onError(
+                        videoCaptureError: Int,
+                        message: String,
+                        cause: Throwable?
+                    ) {
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Error saving video: $message",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Ino baram aks begir:  ${cause!!.message}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            )
+
+            /*localVideoCapture.startRecording(
                 outputOptions,
                 mainExecutor(),
                 object : VideoCapture.OnVideoSavedCallback {
@@ -190,7 +253,7 @@ class MainActivity : AppCompatActivity() {
                         Log.e(TAG, msg)
                         cause?.printStackTrace()
                     }
-                })
+                })*/
         } else {
             animateRecord.cancel()
             localVideoCapture.stopRecording()
@@ -351,5 +414,10 @@ class MainActivity : AppCompatActivity() {
 
             }
         }
+
+    override fun onStop() {
+
+        super.onStop()
+    }
 
 }
