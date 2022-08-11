@@ -24,6 +24,8 @@ import androidx.annotation.DrawableRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.video.OnVideoSavedCallback
+import androidx.camera.view.video.OutputFileResults
 import androidx.core.animation.doOnCancel
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -34,6 +36,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.concurrent.Executor
+
 
 private var PERMISSIONS_REQUIRED = arrayOf(
     Manifest.permission.CAMERA,
@@ -46,10 +49,10 @@ class MainActivity : AppCompatActivity() {
 
     private val outputDirectory: String by lazy {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-//            TODO("Change save folder name")
+            //TODO("Change save folder name")
             "${Environment.DIRECTORY_DCIM}/InAppCamera/"
         } else {
-//            TODO("Change save folder name")
+            //TODO("Change save folder name")
             "${getExternalFilesDir(Environment.DIRECTORY_DCIM)}/InAppCamera/"
         }
     }
@@ -77,7 +80,9 @@ class MainActivity : AppCompatActivity() {
 
         getPermission()
 
-        activityMainBinding.btnRecordVideo.setOnClickListener { recordVideo() }
+        activityMainBinding.btnRecordVideo.setOnClickListener {
+            recordVideo()
+        }
 
         activityMainBinding.btnSwitchCamera.setOnClickListener { toggleCamera() }
 
@@ -93,7 +98,7 @@ class MainActivity : AppCompatActivity() {
         cameraProviderFuture.addListener({
             cameraProvider = cameraProviderFuture.get()
 
-            val rotation = viewFinder.display.rotation
+            val rotation = activityMainBinding.viewFinder.rotation.toInt()
 
             val localCameraProvider = cameraProvider
                 ?: throw IllegalStateException("Camera initialization failed.")
@@ -111,8 +116,8 @@ class MainActivity : AppCompatActivity() {
                 VideoCapture.DEFAULT_CONFIG.config
             videoCapture = VideoCapture.Builder
                 .fromConfig(videoCaptureConfig)
-                .setVideoFrameRate(10)
-                .setMaxResolution(size)
+//                .setVideoFrameRate(10)
+//                .setMaxResolution(size)
                 .build()
 
             localCameraProvider.unbindAll()
@@ -188,72 +193,93 @@ class MainActivity : AppCompatActivity() {
             contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, timestamp)
             contentValues.put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
 
-            localVideoCapture.startRecording(
-                VideoCapture.OutputFileOptions.Builder(
-                    contentResolver,
-                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                    contentValues
-                ).build(),
-                mainExecutor(),
-                object : VideoCapture.OnVideoSavedCallback {
-                    override fun onVideoSaved(outputFileResults: VideoCapture.OutputFileResults) {
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Video has been saved successfully.",
-                            Toast.LENGTH_SHORT
-                        ).show()
+            if (Build.VERSION.SDK_INT > Build.VERSION_CODES.N_MR1) {
 
-                        activityMainBinding.btnRemoveVideo.visibility = View.VISIBLE
-                        playVideo(outputFileResults.savedUri!!)
+                Log.e("onCaptureError", "1")
 
+                localVideoCapture.startRecording(
+                    VideoCapture.OutputFileOptions.Builder(
+                        contentResolver,
+                        MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                        contentValues
+                    ).build(),
+                    mainExecutor(),
+                    object : VideoCapture.OnVideoSavedCallback {
+                        override fun onVideoSaved(outputFileResults: VideoCapture.OutputFileResults) {
+                            Log.e("onCaptureError", "2")
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Video has been saved successfully.",
+                                Toast.LENGTH_SHORT
+                            ).show()
+
+                            activityMainBinding.btnRemoveVideo.visibility = View.VISIBLE
+                            playVideo(outputFileResults.savedUri!!)
+
+                        }
+
+
+
+                        override fun onError(
+                            videoCaptureError: Int,
+                            message: String,
+                            cause: Throwable?
+                        ) {
+                            Log.e("onCaptureError", "3")
+                            animateRecord.cancel()
+                            Log.e("onCaptureError", message)
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Error saving video: $message",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Ino baram aks begir:  ${cause!!.message}",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
                     }
+                )
 
-                    override fun onError(
-                        videoCaptureError: Int,
-                        message: String,
-                        cause: Throwable?
-                    ) {
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Error saving video: $message",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Ino baram aks begir:  ${cause!!.message}",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                }
-            )
+            } else {
 
-            /*localVideoCapture.startRecording(
-                outputOptions,
-                mainExecutor(),
-                object : VideoCapture.OnVideoSavedCallback {
-                    override fun onVideoSaved(outputFileResults: VideoCapture.OutputFileResults) {
-                        // Create small preview
-                        outputFileResults.savedUri
-                            ?.let { uri ->
-                                activityMainBinding.btnRemoveVideo.visibility = View.VISIBLE
-                                playVideo(uri)
-                                Log.d(TAG, "Video saved in $uri")
-                            }
-                    }
+                Log.e("onCaptureError", "4")
 
-                    override fun onError(
-                        videoCaptureError: Int,
-                        message: String,
-                        cause: Throwable?
-                    ) {
-                        // This function is called if there is an error during recording process
-                        animateRecord.cancel()
-                        val msg = "Video capture failed: $message"
-                        Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
-                        Log.e(TAG, msg)
-                        cause?.printStackTrace()
-                    }
-                })*/
+                localVideoCapture.startRecording(
+                    outputOptions,
+                    mainExecutor(),
+                    object : VideoCapture.OnVideoSavedCallback {
+                        override fun onVideoSaved(outputFileResults: VideoCapture.OutputFileResults) {
+                            Log.e("onCaptureError", "5")
+                            // Create small preview
+                            outputFileResults.savedUri
+                                ?.let { uri ->
+                                    activityMainBinding.btnRemoveVideo.visibility = View.VISIBLE
+                                    playVideo(uri)
+                                    Log.d(TAG, "Video saved in $uri")
+                                }
+                        }
+
+                        override fun onError(
+                            videoCaptureError: Int,
+                            message: String,
+                            cause: Throwable?
+                        ) {
+                            Log.e("onCaptureError", "6")
+                            Log.e("onCaptureError", message)
+                            // This function is called if there is an error during recording process
+                            animateRecord.cancel()
+                            val msg = "Video capture failed: $message"
+                            Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
+                            Log.e(TAG, msg)
+                            cause?.printStackTrace()
+                        }
+                    })
+
+            }
+
+
         } else {
             animateRecord.cancel()
             localVideoCapture.stopRecording()
